@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#9ADCF7">
+  <meta name="description" content="Solte o ovo na hora certa e acerte o alvo. Um game de Alex Leal, Lizards Games.">
+  <meta name="author" content="Alex Leal — Lizards Games">
+  <title>myEggs</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="64x64" href="assets/icons/favicon-64.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="myEggs">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <!-- Compartilhamento -->
+  <meta property="og:title" content="myEggs">
+  <meta property="og:description" content="Solte o ovo na hora certa e acerte o alvo.">
+  <meta property="og:image" content="assets/icons/icon-512.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="stage">
+    <canvas id="game" aria-label="Área do jogo. Toque para soltar o ovo."></canvas>
+
+    <div id="hud" hidden>
+      <div id="hud-lives" aria-label="Ovos restantes"></div>
+      <div id="hud-score" class="score-box" aria-live="polite">0</div>
+    </div>
+
+    <section id="menu" class="overlay">
+      <div class="panel">
+        <h1 class="logo">myEggs</h1>
+        <p class="lead">Toque na tela para soltar o ovo e acerte o alvo lá embaixo. Na cabeça vale 3 pontos.</p>
+        <button id="btn-play" class="btn" type="button">Jogar</button>
+        <button id="btn-install" class="btn-link" type="button" hidden>Instalar no celular</button>
+        <p class="plays"><span data-plays>…</span></p>
+        <h2 class="board-title">Top 5</h2>
+        <ol class="board" data-board></ol>
+
+        <footer class="credits">
+          <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          <span>Um game de Alex Leal</span>
+        </footer>
+      </div>
+    </section>
+
+    <section id="over" class="overlay" hidden>
+      <div class="panel">
+        <h2 class="over-title">Acabaram os ovos</h2>
+        <p class="final"><span id="final-score">0</span><small>pontos</small></p>
+        <p class="best" id="final-best"></p>
+
+        <form id="name-form" hidden autocomplete="off">
+          <label for="name-input">Você entrou no top 5. Seu nome:</label>
+          <div class="name-row">
+            <input id="name-input" name="name" maxlength="16" required
+                   enterkeyhint="done" spellcheck="false" placeholder="Seu nome">
+            <button id="btn-save" class="btn btn-small" type="submit">Salvar</button>
+          </div>
+        </form>
+        <p id="over-status" class="status" role="status"></p>
+
+        <button id="btn-again" class="btn" type="button">Jogar de novo</button>
+        <p class="plays"><span data-plays>…</span></p>
+        <h2 class="board-title">Top 5</h2>
+        <ol class="board" data-board></ol>
+
+        <footer class="credits">
+          <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          <span>Um game de Alex Leal</span>
+        </footer>
+      </div>
+    </section>
+
+    <div id="pause" class="overlay pause" hidden>
+      <p>Pausado. Toque para continuar.</p>
+    </div>
+
+    <button id="btn-mute" class="mute" type="button" aria-label="Desligar som">🔊</button>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

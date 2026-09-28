@@ -1,0 +1,17 @@
+# segredos
+.env
+*.env
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# lixo de editor / sistema
+*~
+*.bak
+.DS_Store
+Thumbs.db
+desktop.ini
