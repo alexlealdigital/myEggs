@@ -17,6 +17,24 @@
       targetHit: "assets/sprites/alvo_acertado.png"
     },
 
+    // Vozes do alvo quando é atingido (tocam em sorteio, sem repetir a mesma seguida).
+    //   delay:  segundos depois do splat
+    //   volume: 0 a 1
+    //   mode:   "cut"  = acerto novo corta a voz que ainda está tocando
+    //           "skip" = se uma voz ainda estiver tocando, o acerto novo fica sem voz
+    AUDIO: {
+      hitVoices: [
+        "assets/audio/eggs_01.mp3",
+        "assets/audio/eggs_02.mp3",
+        "assets/audio/eggs_03.mp3",
+        "assets/audio/eggs_04.mp3",
+        "assets/audio/eggs_05.mp3"
+      ],
+      delay: 0.12,
+      volume: 0.9,
+      mode: "cut"
+    },
+
     // Área de acerto, em frações da caixa do alvo (0 = esquerda/topo, 1 = direita/base).
     // Calibrada para o alvo.png atual. Se trocar a arte, ajuste aqui.
     //   head: elipse (centro cx,cy e raios rx,ry)  -> 3 pontos

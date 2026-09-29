@@ -99,6 +99,7 @@
       if (AC) { try { actx = new AC(); } catch (e) { actx = null; } }
     }
     if (actx && actx.state === "suspended") actx.resume();
+    if (actx && voices.raw.length) decodeVoices();
     return actx;
   }
   function tone(f1, f2, dur, type, vol) {
@@ -124,6 +125,79 @@
     miss: () => { noise(0.25, 0.25, 700); tone(170, 60, 0.3, "sine", 0.2); },
     over: () => { tone(440, 220, 0.25, "triangle", 0.1); setTimeout(() => tone(330, 110, 0.4, "triangle", 0.1), 180); },
   };
+  // ------------------------------------------------------------ Vozes do alvo
+  // Arquivos em CFG.AUDIO.hitVoices. Baixados no início e decodificados no
+  // primeiro toque (exigência de navegador para áudio). Sorteio sem repetir
+  // a mesma voz duas vezes seguidas.
+  const VOICE = Object.assign(
+    { hitVoices: [], delay: 0.12, volume: 0.9, mode: "cut" },
+    CFG.AUDIO || {}
+  );
+  const voices = { raw: [], buffers: [], bag: [], last: -1, current: null, decoding: false };
+
+  VOICE.hitVoices.forEach((src) => {
+    fetch(src)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((ab) => { if (ab) { voices.raw.push(ab); decodeVoices(); } })
+      .catch(() => { /* sem essa voz, o jogo segue */ });
+  });
+
+  function decodeVoices() {
+    if (!actx || !voices.raw.length) return;
+    const pending = voices.raw.splice(0);
+    pending.forEach((ab) => {
+      // forma com callback: funciona também em Safari antigo
+      try {
+        actx.decodeAudioData(ab, (buf) => voices.buffers.push(buf), () => {});
+      } catch (e) { /* formato não suportado */ }
+    });
+  }
+
+  function stopVoice() {
+    const cur = voices.current;
+    if (!cur || !actx) return;
+    voices.current = null;
+    try {
+      cur.gain.gain.setTargetAtTime(0, actx.currentTime, 0.015);
+      cur.src.stop(actx.currentTime + 0.06);
+    } catch (e) { /* já terminou */ }
+  }
+
+  function nextVoiceIndex() {
+    const n = voices.buffers.length;
+    if (n === 1) return 0;
+    if (!voices.bag.length) {
+      voices.bag = Array.from({ length: n }, (_, i) => i);
+      for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [voices.bag[i], voices.bag[j]] = [voices.bag[j], voices.bag[i]];
+      }
+      // a próxima a sair (fim do array) não pode repetir a última tocada
+      if (voices.bag[n - 1] === voices.last) [voices.bag[0], voices.bag[n - 1]] = [voices.bag[n - 1], voices.bag[0]];
+    }
+    return voices.bag.pop();
+  }
+
+  function playVoice() {
+    if (muted || G.state !== "playing") return;
+    const a = audio();
+    if (!a || !voices.buffers.length) return;
+    if (voices.current) {
+      if (VOICE.mode === "skip") return;
+      stopVoice();
+    }
+    const i = nextVoiceIndex();
+    voices.last = i;
+    const src = a.createBufferSource(), g = a.createGain();
+    src.buffer = voices.buffers[i];
+    g.gain.value = VOICE.volume;
+    src.connect(g).connect(a.destination);
+    const cur = { src, gain: g, index: i };
+    src.onended = () => { if (voices.current === cur) voices.current = null; };
+    voices.current = cur;
+    src.start();
+  }
+
   const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* sem suporte */ } };
 
   function renderMute() {
@@ -260,6 +334,7 @@
     burst(egg.x, egg.y, 14);
     floatText(egg.x, egg.y - L.eggRy * 1.5, kind === "head" ? "Na cara! +3" : "+1", kind === "head" ? COLORS.alert : COLORS.paper, kind === "head" ? 1.25 : 1);
     (kind === "head" ? sfx.head : sfx.body)();
+    setTimeout(playVoice, VOICE.delay * 1000);          // reação do alvo depois do splat
     buzz(kind === "head" ? 40 : 20);
     egg.mode = "wait"; egg.respawnIn = 0.28;
     renderHud(true);
@@ -707,7 +782,7 @@
   ui.pause.addEventListener("pointerdown", (e) => { e.preventDefault(); resumeGame(); });
   ui.mute.addEventListener("click", () => {
     muted = !muted; store.set("mute", muted ? "1" : "0"); renderMute();
-    if (!muted) audio();
+    if (muted) stopVoice(); else audio();
   });
 
   window.addEventListener("keydown", (e) => {
@@ -759,7 +834,7 @@
 
   // Ganchos de teste / exportação de sprites (usados só em desenvolvimento)
   window.MYEGGS = {
-    G, egg, tgt, L,
+    G, egg, tgt, L, voices, playVoice,
     exportSprite(kind, w, h) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const main = ctx; ctx = c.getContext("2d");

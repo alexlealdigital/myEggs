@@ -1,6 +1,6 @@
 /* myEggs — service worker
    Troque VERSION a cada deploy que mudar arquivos (o subir-github.bat faz isso sozinho). */
-const VERSION = "myeggs-20260928-091316";
+const VERSION = "myeggs-20260929-094123";
 const CORE = [
   "./",
   "./index.html",
@@ -11,6 +11,11 @@ const CORE = [
   "./assets/sprites/ovo.png",
   "./assets/sprites/alvo.png",
   "./assets/sprites/alvo_acertado.png",
+  "./assets/audio/eggs_01.mp3",
+  "./assets/audio/eggs_02.mp3",
+  "./assets/audio/eggs_03.mp3",
+  "./assets/audio/eggs_04.mp3",
+  "./assets/audio/eggs_05.mp3",
   "./assets/lizards-games.png",
   "./assets/icons/icon-192.png",
   "./assets/icons/favicon-64.png"
