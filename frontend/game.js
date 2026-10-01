@@ -69,6 +69,10 @@
     L.eggY = H * 0.22;
     L.groundY = H * 0.88;
     L.tw = L.unit * 0.21;
+    L.sw = L.unit * 0.24;            // figurante lateral (largura)
+    L.sh = L.sw * 1.35;              // figurante lateral (altura)  -> sprite 400x540
+    L.pw = L.unit * 0.44;            // avião (largura)
+    L.ph = L.pw * 0.45;              // avião (altura)              -> sprite 440x200
     L.th = L.tw * 1.3;
 
     egg.x = clamp(egg.x || W / 2, eggMinX(), eggMaxX());
@@ -349,6 +353,7 @@
     sfx.miss(); buzz(90);
     G.shake = 0.25;
     renderHud(false);
+    if (G.lives === SCN.triggerLives) startScene();
     if (G.lives <= 0) { egg.mode = "dead"; G.overIn = 0.7; }
     else { egg.mode = "wait"; egg.respawnIn = 0.45; }
   }
@@ -380,10 +385,57 @@
     }));
   }
 
+  // ------------------------------------------------------------ Figurantes (último ovo)
+  // Quando sobra só 1 ovo, entram elementos de cena: figurante da esquerda
+  // sobe e desce, o da direita sobe e desce, ou um avião cruza a tela.
+  // Um de cada vez, sorteados, sem repetir o mesmo duas vezes seguidas.
+  const SCN = Object.assign(
+    { triggerLives: 1, firstDelay: 0.5, gapMin: 0.9, gapMax: 2.0, rise: 0.45, hold: 0.9, fall: 0.4, planeTime: 2.8, planeY: 0.40 },
+    CFG.SCENE || {}
+  );
+  const scene = { active: false, nextIn: 0, cur: null, lastKind: null };
+
+  function startScene() { scene.active = true; scene.nextIn = SCN.firstDelay; }
+  function stopScene(clearNow) { scene.active = false; if (clearNow) scene.cur = null; }
+
+  function spawnSceneEvent() {
+    const kinds = ["left", "right", "plane"].filter((k) => k !== scene.lastKind);
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    scene.lastKind = kind;
+    if (kind === "plane") scene.cur = { kind, t: 0, dur: SCN.planeTime, dir: sign() };
+    else scene.cur = { kind, t: 0, dur: SCN.rise + SCN.hold + SCN.fall };
+  }
+
+  function updateScene(dt) {
+    if (scene.cur) {
+      scene.cur.t += dt;
+      if (scene.cur.t >= scene.cur.dur) scene.cur = null;
+      return;                                   // o intervalo só conta depois que o atual sai
+    }
+    if (!scene.active) return;
+    scene.nextIn -= dt;
+    if (scene.nextIn <= 0) {
+      spawnSceneEvent();
+      scene.nextIn = rand(SCN.gapMin, SCN.gapMax);
+    }
+  }
+
+  const easeOutBack = (x) => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+  const easeInCubic = (x) => x * x * x;
+
+  // 0..1 de quanto o figurante está para fora do palco
+  function sideRise(ev) {
+    const t = ev.t;
+    if (t < SCN.rise) return easeOutBack(t / SCN.rise);
+    if (t < SCN.rise + SCN.hold) return 1;
+    return 1 - easeInCubic(Math.min(1, (t - SCN.rise - SCN.hold) / SCN.fall));
+  }
+
   // ------------------------------------------------------------ Update
   function update(dt) {
     G.time += dt;
     updateTarget(dt);
+    updateScene(dt);
     egg.spawnT = Math.min(1, egg.spawnT + dt * 5);
 
     if (egg.mode === "aim" || egg.mode === "idle") updateEggAim(dt);
@@ -576,10 +628,94 @@
     });
   }
 
+  function drawFigureShape(x, topY, w, h, shirt, waveT) {
+    const lw = Math.max(2.5, w * 0.035);
+    ctx.save();
+    ctx.lineWidth = lw; ctx.strokeStyle = COLORS.ink; ctx.lineJoin = "round"; ctx.lineCap = "round";
+    const bodyTop = topY + h * 0.42, bw = w * 0.7;
+    // braços para cima, acenando
+    const swing = Math.sin(waveT * 9) * 0.25;
+    ctx.fillStyle = shirt;
+    [-1, 1].forEach((s) => {
+      ctx.save();
+      ctx.translate(x + s * bw * 0.42, bodyTop + h * 0.08);
+      ctx.rotate(-s * (2.75 + swing * 0.6));               // braço para cima e para fora (em V)
+      ctx.beginPath(); ctx.roundRect(-w * 0.07, 0, w * 0.14, h * 0.34, w * 0.07); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    });
+    // corpo
+    ctx.beginPath(); ctx.roundRect(x - bw / 2, bodyTop, bw, h - (bodyTop - topY) + lw, [w * 0.2, w * 0.2, 0, 0]);
+    ctx.fill(); ctx.stroke();
+    // cabeça
+    const hx = x, hy = topY + h * 0.24, hr = w * 0.22;
+    ctx.fillStyle = COLORS.skin;
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COLORS.ink;
+    [-1, 1].forEach((s) => { ctx.beginPath(); ctx.arc(hx + s * hr * 0.36, hy - hr * 0.05, hr * 0.1, 0, Math.PI * 2); ctx.fill(); });
+    ctx.beginPath(); ctx.ellipse(hx, hy + hr * 0.42, hr * 0.17, hr * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlaneShape(x, y, w, h) {
+    // virado para a direita; centro em (x, y)
+    const lw = Math.max(2.5, h * 0.06);
+    ctx.save();
+    ctx.lineWidth = lw; ctx.strokeStyle = COLORS.ink; ctx.lineJoin = "round";
+    const fx = x - w * 0.42, fw = w * 0.8, fy = y - h * 0.16, fh = h * 0.34;
+    // leme
+    ctx.fillStyle = COLORS.alert;
+    ctx.beginPath(); ctx.moveTo(fx + w * 0.02, fy + fh * 0.2); ctx.lineTo(fx - w * 0.04, y - h * 0.48); ctx.lineTo(fx + w * 0.14, fy + lw); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // fuselagem
+    ctx.fillStyle = COLORS.paper;
+    ctx.beginPath(); ctx.roundRect(fx, fy, fw, fh, [fh * 0.3, fh * 0.6, fh * 0.6, fh * 0.3]); ctx.fill(); ctx.stroke();
+    // janelas
+    ctx.fillStyle = COLORS.stage;
+    for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(fx + fw * (0.4 + i * 0.12), fy + fh * 0.42, fh * 0.12, 0, Math.PI * 2); ctx.fill(); }
+    // asa
+    ctx.fillStyle = COLORS.yolk;
+    ctx.beginPath(); ctx.moveTo(fx + fw * 0.38, fy + fh * 0.6); ctx.lineTo(fx + fw * 0.6, fy + fh * 0.6); ctx.lineTo(fx + fw * 0.42, y + h * 0.48); ctx.lineTo(fx + fw * 0.3, y + h * 0.48); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // hélice
+    ctx.fillStyle = COLORS.ink;
+    ctx.beginPath(); ctx.ellipse(fx + fw + lw, y, w * 0.015, h * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawScene() {
+    const ev = scene.cur;
+    if (!ev) return;
+    if (ev.kind === "plane") {
+      const p = ev.t / ev.dur;
+      const span = W + L.pw * 1.2;
+      const x = ev.dir > 0 ? -L.pw * 0.6 + span * p : W + L.pw * 0.6 - span * p;
+      const y = H * SCN.planeY + Math.sin(ev.t * 3) * H * 0.008;
+      ctx.save();
+      ctx.translate(x, y);
+      if (ev.dir < 0) ctx.scale(-1, 1);              // sprite olha para a direita
+      if (sprites.plane) ctx.drawImage(sprites.plane, -L.pw / 2, -L.ph / 2, L.pw, L.ph);
+      else drawPlaneShape(0, 0, L.pw, L.ph);
+      ctx.restore();
+      return;
+    }
+    // figurantes laterais: saem de trás do palco
+    const e = sideRise(ev);
+    const isLeft = ev.kind === "left";
+    const x = isLeft ? L.sw * 0.5 + 4 : W - L.sw * 0.5 - 4;
+    const topY = L.groundY - L.sh * e;
+    const tilt = ev.t > SCN.rise && ev.t < SCN.rise + SCN.hold ? Math.sin(ev.t * 7) * 0.05 : 0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, W, L.groundY - 1); ctx.clip();   // esconde o que está "dentro" do palco
+    ctx.translate(x, L.groundY); ctx.rotate(tilt); ctx.translate(-x, -L.groundY);
+    const img = isLeft ? sprites.sideLeft : sprites.sideRight;
+    if (img) ctx.drawImage(img, x - L.sw / 2, topY, L.sw, L.sh);
+    else drawFigureShape(x, topY, L.sw, L.sh, isLeft ? COLORS.alert : "#39B97A", ev.t);
+    ctx.restore();
+  }
+
   function render() {
     ctx.save();
     if (G.shake > 0) ctx.translate(rand(-1, 1) * G.shake * 24, rand(-1, 1) * G.shake * 16);
     drawBackground();
+    drawScene();
     drawTarget();
     if (SHOW_HITBOX) drawHitbox();
     drawEgg();
@@ -691,6 +827,7 @@
     audio();
     Object.assign(G, { state: "playing", paused: false, score: 0, lives: LIVES, hits: 0, streak: 0, playId: null, submitted: false, shake: 0 });
     fx.parts = []; fx.texts = []; fx.ground = [];
+    stopScene(true); scene.lastKind = null;
     tgt.splats = []; tgt.hitT = 0; tgt.x = W / 2; tgt.dir = sign(); tgt.mul = 1; tgt.flipIn = rand(1.2, 2.2);
     spawnEgg();
     renderHud(false);
@@ -709,6 +846,7 @@
 
   function gameOver() {
     G.state = "over";
+    stopScene(false);                  // o que estiver em cena termina o movimento
     egg.mode = "idle"; spawnEgg();
     stage.classList.remove("playing");
     sfx.over();
@@ -834,12 +972,17 @@
 
   // Ganchos de teste / exportação de sprites (usados só em desenvolvimento)
   window.MYEGGS = {
-    G, egg, tgt, L, voices, playVoice,
+    G, egg, tgt, L, voices, playVoice, scene, SCN,
     exportSprite(kind, w, h) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const main = ctx; ctx = c.getContext("2d");
       try {
         if (kind === "egg") drawEggShape(w / 2, h / 2, w * 0.44, h * 0.45);
+        else if (kind === "plane") drawPlaneShape(w / 2, h / 2, w * 0.94, h * 0.9);
+        else if (kind === "sideLeft" || kind === "sideRight") {
+          const fw = w * 0.92, fh = fw * 1.35;
+          drawFigureShape(w / 2, h - fh, fw, fh, kind === "sideLeft" ? COLORS.alert : "#39B97A", 0);
+        }
         else { const tw = w * 0.92, th = tw * 1.3; drawTargetShape(w / 2, (h - th) / 2, tw, th, kind === "targetHit", 0); }
       } finally { ctx = main; }
       return c.toDataURL("image/png");

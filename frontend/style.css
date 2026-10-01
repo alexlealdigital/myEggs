@@ -359,7 +359,7 @@ body {
 .mute {
   position: absolute;
   z-index: 4;
-  right: 14px;
+  left: calc(env(safe-area-inset-left, 0px) + 14px);
   bottom: calc(var(--safe-bottom) + 14px);
   width: 44px;
   height: 44px;

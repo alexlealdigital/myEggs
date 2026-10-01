@@ -1,6 +1,6 @@
 /* myEggs — service worker
    Troque VERSION a cada deploy que mudar arquivos (o subir-github.bat faz isso sozinho). */
-const VERSION = "myeggs-20260929-094123";
+const VERSION = "myeggs-20260930-221000";
 const CORE = [
   "./",
   "./index.html",
@@ -11,18 +11,27 @@ const CORE = [
   "./assets/sprites/ovo.png",
   "./assets/sprites/alvo.png",
   "./assets/sprites/alvo_acertado.png",
+  "./assets/sprites/figurante_esq.png",
+  "./assets/sprites/figurante_dir.png",
+  "./assets/sprites/aviao.png",
   "./assets/audio/eggs_01.mp3",
   "./assets/audio/eggs_02.mp3",
-  "./assets/audio/eggs_03.mp3",
   "./assets/audio/eggs_04.mp3",
   "./assets/audio/eggs_05.mp3",
+  "./assets/audio/eggs_06.mp3",
+  "./assets/audio/eggs_07.mp3",
   "./assets/lizards-games.png",
   "./assets/icons/icon-192.png",
   "./assets/icons/favicon-64.png"
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // Um por um: se algum arquivo faltar (ex.: sprite removido), o resto ainda vai para o cache.
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => Promise.all(CORE.map((u) => c.add(u).catch(() => null))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (e) => {

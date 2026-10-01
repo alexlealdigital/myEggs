@@ -14,7 +14,12 @@
     SPRITES: {
       egg: "assets/sprites/ovo.png",
       target: "assets/sprites/alvo.png",
-      targetHit: "assets/sprites/alvo_acertado.png"
+      targetHit: "assets/sprites/alvo_acertado.png",
+      //   figurante_esq.png / figurante_dir.png  400x540 (base da imagem = pé no palco)
+      //   aviao.png                              440x200, olhando para a DIREITA
+      sideLeft: "assets/sprites/figurante_esq.png",
+      sideRight: "assets/sprites/figurante_dir.png",
+      plane: "assets/sprites/aviao.png"
     },
 
     // Vozes do alvo quando é atingido (tocam em sorteio, sem repetir a mesma seguida).
@@ -26,13 +31,33 @@
       hitVoices: [
         "assets/audio/eggs_01.mp3",
         "assets/audio/eggs_02.mp3",
-        "assets/audio/eggs_03.mp3",
         "assets/audio/eggs_04.mp3",
-        "assets/audio/eggs_05.mp3"
+        "assets/audio/eggs_05.mp3",
+        "assets/audio/eggs_06.mp3",
+        "assets/audio/eggs_07.mp3"
       ],
       delay: 0.12,
       volume: 0.9,
       mode: "cut"
+    },
+
+    // Elementos de cena quando sobra o último ovo (tempos em segundos).
+    //   triggerLives: com quantos ovos restantes começa (1 = último ovo)
+    //   firstDelay:   espera até o primeiro aparecer
+    //   gapMin/Max:   intervalo sorteado entre um e outro
+    //   rise/hold/fall: subir, ficar, descer (figurantes laterais)
+    //   planeTime:    tempo do avião cruzando a tela
+    //   planeY:       altura do avião (0 = topo, 1 = base)
+    SCENE: {
+      triggerLives: 1,
+      firstDelay: 0.5,
+      gapMin: 0.9,
+      gapMax: 2.0,
+      rise: 0.45,
+      hold: 0.9,
+      fall: 0.4,
+      planeTime: 2.8,
+      planeY: 0.40
     },
 
     // Área de acerto, em frações da caixa do alvo (0 = esquerda/topo, 1 = direita/base).
