@@ -213,7 +213,7 @@
   const G = {
     state: "menu",           // menu | playing | over
     paused: false,
-    score: 0, lives: LIVES, hits: 0, streak: 0,
+    score: 0, lives: LIVES, hits: 0, heads: 0, streak: 0,
     playId: null, playPromise: null, submitted: false,
     shake: 0, overIn: 0, time: 0,
   };
@@ -333,6 +333,7 @@
   function onHit(kind) {
     const pts = kind === "head" ? 3 : 1;
     G.score += pts; G.hits += 1; G.streak += 1;
+    if (kind === "head") G.heads += 1;
     tgt.hitT = 0.55;
     tgt.splats.push({ dx: egg.x - tgt.x, dy: egg.y - tgtTop(), t: 1.6, r: L.eggRx * rand(0.9, 1.25), seed: Math.random() * 10 });
     burst(egg.x, egg.y, 14);
@@ -825,7 +826,7 @@
   // ------------------------------------------------------------ Fluxo
   function startGame() {
     audio();
-    Object.assign(G, { state: "playing", paused: false, score: 0, lives: LIVES, hits: 0, streak: 0, playId: null, submitted: false, shake: 0 });
+    Object.assign(G, { state: "playing", paused: false, score: 0, lives: LIVES, hits: 0, heads: 0, streak: 0, playId: null, submitted: false, shake: 0 });
     fx.parts = []; fx.texts = []; fx.ground = [];
     stopScene(true); scene.lastKind = null;
     tgt.splats = []; tgt.hitT = 0; tgt.x = W / 2; tgt.dir = sign(); tgt.mul = 1; tgt.flipIn = rand(1.2, 2.2);
@@ -873,6 +874,7 @@
     ui.hud.hidden = true;
     ui.over.hidden = false;
     ui.again.focus({ preventScroll: true });
+    prepareCard("score");              // deixa a imagem pronta antes do clique
   }
 
   async function submitScore(ev) {
@@ -938,6 +940,260 @@
   window.addEventListener("resize", resize);
   document.addEventListener("gesturestart", (e) => e.preventDefault());
 
+  // ------------------------------------------------------------ Compartilhar
+  const SHARE_URL = CFG.SHARE_URL || (location.origin + "/");
+  const toastEl = $("#toast");
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.hidden = true; }, 2600);
+  }
+
+  // ---------- Card de resultado (imagem 1080x1920, formato Stories)
+  const CARD_W = 1080, CARD_H = 1920;
+  // Frase do balão do card. Com mais de uma, o jogo sorteia.
+  const SPEECH = [
+    "Mermão, estarei contigo sempre!",
+  ];
+  const cards = { menu: null, score: null };      // { file, text } prontos para compartilhar
+  let logoImg = null;
+  const logoReady = new Promise((res) => {
+    const im = new Image();
+    im.onload = () => { logoImg = im; res(); };
+    im.onerror = () => res();
+    im.src = "assets/lizards-games.png";
+  });
+
+  function shareText(kind) {
+    if (kind === "score" && G.score > 0) {
+      const p = G.score === 1 ? "ponto" : "pontos";
+      return `Fiz ${fmt(G.score)} ${p} no myEggs. Duvido você bater! 🥚 ${SHARE_URL}`;
+    }
+    return `Bora jogar myEggs? Solte o ovo na hora certa e acerte o alvo. 🥚 ${SHARE_URL}`;
+  }
+
+  function cardText(c, text, x, y, size, opts) {
+    const o = Object.assign({ font: "display", fill: COLORS.ink, stroke: 0, shadow: 0, align: "center", weight: 800 }, opts || {});
+    c.font = o.font === "display"
+      ? `${size}px "Lilita One", "Arial Black", sans-serif`
+      : `${o.weight} ${size}px "Nunito", system-ui, sans-serif`;
+    c.textAlign = o.align; c.textBaseline = "middle"; c.lineJoin = "round";
+    if (o.shadow) { c.lineWidth = o.stroke * 2; c.strokeStyle = COLORS.ink; c.fillStyle = COLORS.ink; c.strokeText(text, x + o.shadow, y + o.shadow); c.fillText(text, x + o.shadow, y + o.shadow); }
+    if (o.stroke) { c.lineWidth = o.stroke * 2; c.strokeStyle = COLORS.ink; c.strokeText(text, x, y); }
+    c.fillStyle = o.fill; c.fillText(text, x, y);
+  }
+
+  function fitSize(c, text, maxW, size, family) {
+    let s = size;
+    do { c.font = family === "display" ? `${s}px "Lilita One", "Arial Black", sans-serif` : `900 ${s}px "Nunito", system-ui, sans-serif`; s -= 4; }
+    while (c.measureText(text).width > maxW && s > 20);
+    return s + 4;
+  }
+
+  function drawCard(kind) {
+    const cv = document.createElement("canvas");
+    cv.width = CARD_W; cv.height = CARD_H;
+    const c = cv.getContext("2d");
+    const main = ctx; ctx = c;                   // reaproveita splat/ovo/alvo do jogo
+    try {
+      const gy = 1560;
+      // céu, sol, nuvens
+      c.fillStyle = COLORS.sky; c.fillRect(0, 0, CARD_W, CARD_H);
+      c.fillStyle = COLORS.sun; c.beginPath(); c.arc(220, 700, 150, 0, Math.PI * 2); c.fill();
+      c.fillStyle = COLORS.cloud;
+      [].forEach(([x, y, r]) => {
+        c.beginPath();
+        c.arc(x, y, r, 0, Math.PI * 2); c.arc(x + r * 1.1, y - r * 0.45, r * 1.2, 0, Math.PI * 2); c.arc(x + r * 2.3, y, r * 0.95, 0, Math.PI * 2);
+        c.rect(x, y, r * 2.3, r * 0.95); c.fill();
+      });
+      // bandeirinhas
+      const n = 12, y0 = 60;
+      c.strokeStyle = COLORS.ink; c.lineWidth = 5;
+      c.beginPath(); c.moveTo(-5, y0); c.quadraticCurveTo(CARD_W / 2, y0 + 120, CARD_W + 5, y0); c.stroke();
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n, x = t * CARD_W, y = (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * (y0 + 120) + t * t * y0, fw = CARD_W / n * 0.38;
+        c.fillStyle = COLORS.flags[i % COLORS.flags.length];
+        c.beginPath(); c.moveTo(x - fw, y); c.lineTo(x + fw, y); c.lineTo(x, y + fw * 1.5); c.closePath(); c.fill(); c.stroke();
+      }
+      // palco
+      c.fillStyle = COLORS.stage; c.fillRect(0, gy, CARD_W, CARD_H - gy);
+      c.fillStyle = COLORS.stageTop; c.fillRect(0, gy, CARD_W, 18);
+      c.fillStyle = COLORS.ink; c.fillRect(0, gy - 4, CARD_W, 8);
+
+      // avião passando por cima das bandeirinhas
+      c.save(); c.translate(255, 140); c.rotate(-0.2);
+      const pw2 = 560, ph2 = pw2 * 0.45;
+      if (sprites.plane) c.drawImage(sprites.plane, -pw2 / 2, -ph2 / 2, pw2, ph2);
+      else drawPlaneShape(0, 0, pw2, ph2);
+      c.restore();
+
+      // título
+      c.save(); c.translate(560, 255); c.rotate(-0.04);
+      cardText(c, "myEggs", 0, 0, 165, { fill: COLORS.yolk, stroke: 10, shadow: 10 });
+      c.restore();
+
+      // painel
+      const px = 110, py = 370, pw = CARD_W - 220, ph = 500;
+      c.fillStyle = COLORS.ink; c.beginPath(); c.roundRect(px + 14, py + 14, pw, ph, 40); c.fill();
+      c.fillStyle = COLORS.paper; c.beginPath(); c.roundRect(px, py, pw, ph, 40); c.fill();
+      c.lineWidth = 10; c.strokeStyle = COLORS.ink; c.stroke();
+
+      if (kind === "score" && G.score > 0) {
+        cardText(c, "Fiz", CARD_W / 2, py + 70, 60, { font: "body", weight: 900 });
+        const num = fmt(G.score);
+        cardText(c, num, CARD_W / 2, py + 220, fitSize(c, num, pw - 120, 240, "display"), { fill: COLORS.yolk, stroke: 12, shadow: 12 });
+        const sub = G.heads > 0
+          ? `pontos · ${fmt(G.heads)} ${G.heads === 1 ? "ovada" : "ovadas"} na cabeça`
+          : "pontos";
+        cardText(c, sub, CARD_W / 2, py + 365, fitSize(c, sub, pw - 80, 50, "body"), { font: "body", weight: 900 });
+        cardText(c, "Duvido você bater!", CARD_W / 2, py + 440, 66, { fill: COLORS.alert, stroke: 4 });
+      } else {
+        cardText(c, "Bora jogar?", CARD_W / 2, py + 170, 130, { fill: COLORS.yolk, stroke: 10, shadow: 10 });
+        cardText(c, "Solte o ovo na hora certa", CARD_W / 2, py + 320, 54, { font: "body", weight: 900 });
+        cardText(c, "e acerte o alvo.", CARD_W / 2, py + 390, 54, { font: "body", weight: 900 });
+      }
+
+      // alvo inclinado, como se tivesse levado a ovada
+      const tw = 390, th = tw * 1.3, tx = 530, tTop = gy - th;
+      const tilt = 0.33, pivX = tx, pivY = gy + 20;
+      const rotP = (x, y) => {
+        const dx = x - pivX, dy = y - pivY;
+        return [pivX + dx * Math.cos(tilt) - dy * Math.sin(tilt), pivY + dx * Math.sin(tilt) + dy * Math.cos(tilt)];
+      };
+      c.fillStyle = "rgba(0,0,0,.22)"; c.beginPath(); c.ellipse(tx + 70, gy + 8, tw * 0.5, 24, 0, 0, Math.PI * 2); c.fill();
+      const hxL = tx - tw / 2 + HB.head.cx * tw;
+      const hyTop = tTop + Math.max(0.06, HB.head.cy - HB.head.ry * 0.75) * th;
+      c.save();
+      c.beginPath(); c.rect(0, 0, CARD_W, gy - 2); c.clip();          // o que passa do palco fica escondido
+      c.translate(pivX, pivY); c.rotate(tilt); c.translate(-pivX, -pivY);
+      const tImg = sprites.target || sprites.targetHit;
+      if (tImg) c.drawImage(tImg, tx - tw / 2, tTop, tw, th);
+      else drawTargetShape(tx, tTop, tw, th, false, 0);
+      splat(hxL + 30, hyTop - 10, 72, 2.3, 1);                         // ovo estourado na cabeça
+      c.restore();
+      const [headPX, headPY] = rotP(hxL, tTop + HB.head.cy * th);
+      const [spX, spY] = rotP(hxL + 30, hyTop - 10);
+      // respingos
+      [[-150, -70, 13], [-110, -150, 11], [-10, -175, 15], [110, -150, 12], [-200, 20, 9]].forEach(([dx, dy, r], i) => {
+        c.fillStyle = i % 2 ? COLORS.yolk : COLORS.shell;
+        c.beginPath(); c.arc(spX + dx, spY + dy, r, 0, Math.PI * 2); c.fill();
+      });
+
+      // figurante na lateral direita, saindo do palco
+      c.save();
+      c.beginPath(); c.rect(0, 0, CARD_W, gy - 2); c.clip();
+      const fwid = 400, fhei = fwid * 1.35, fx = 1005, ftop = gy - fhei + 20;
+      if (sprites.sideLeft) c.drawImage(sprites.sideLeft, fx - fwid / 2, ftop, fwid, fhei);
+      else drawFigureShape(fx, ftop, fwid, fhei, COLORS.alert, 0);
+      c.restore();
+
+      // ovo a caminho
+      c.save(); c.translate(115, 965); c.rotate(-0.35);
+      if (sprites.egg) c.drawImage(sprites.egg, -58, -72, 116, 145);
+      else drawEggShape(0, 0, 58, 72);
+      c.restore();
+
+      // balão de fala (até 2 linhas), à esquerda do alvo
+      const phrase = SPEECH[Math.floor(Math.random() * SPEECH.length)];
+      const maxTextW = 380;
+      let bs = 50, lines;
+      for (; bs >= 30; bs -= 2) {
+        c.font = `900 ${bs}px "Nunito", system-ui, sans-serif`;
+        lines = [];
+        let line = "";
+        phrase.split(" ").forEach((w) => {
+          const t = line ? line + " " + w : w;
+          if (c.measureText(t).width > maxTextW && line) { lines.push(line); line = w; } else line = t;
+        });
+        lines.push(line);
+        if (lines.length <= 2 && lines.every((l) => c.measureText(l).width <= maxTextW)) break;
+      }
+      const lineH = bs * 1.2;
+      const bw = Math.max(...lines.map((l) => c.measureText(l).width)) + 70;
+      const bh = lines.length * lineH + 50, bx = 40, by = 1090;
+      c.fillStyle = COLORS.paper; c.strokeStyle = COLORS.ink; c.lineWidth = 8; c.lineJoin = "round";
+      // rabicho apontando para a cabeça
+      c.beginPath();
+      c.moveTo(bx + bw - 30, by + bh * 0.35);
+      c.lineTo(headPX - tw * 0.24, headPY);
+      c.lineTo(bx + bw - 30, by + bh * 0.7);
+      c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.roundRect(bx, by, bw, bh, 34); c.fill(); c.stroke();
+      lines.forEach((l, i) => cardText(c, l, bx + bw / 2, by + 25 + lineH * (i + 0.5), bs, { font: "body", weight: 900 }));
+
+      // rodapé: endereço + estúdio
+      c.fillStyle = COLORS.paper; c.strokeStyle = COLORS.ink; c.lineWidth = 8;
+      c.beginPath(); c.roundRect(90, 1640, CARD_W - 180, 130, 30); c.fill(); c.stroke();
+      const host = SHARE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "");
+      cardText(c, host, CARD_W / 2, 1707, fitSize(c, host, CARD_W - 260, 56, "body"), { font: "body", weight: 900, fill: COLORS.stage });
+      const lh = 110;
+      let lx = CARD_W / 2 - 250;
+      if (logoImg) { const lw = logoImg.width * lh / logoImg.height; c.drawImage(logoImg, lx, 1790, lw, lh); lx += lw + 24; }
+      cardText(c, "Um game de Alex Leal", lx, 1845, 42, { font: "body", weight: 900, fill: COLORS.paper, align: "left" });
+    } finally {
+      ctx = main;
+    }
+    return cv;
+  }
+
+  async function prepareCard(kind) {
+    cards[kind] = null;
+    try {
+      await Promise.race([
+        Promise.all([
+          logoReady,
+          document.fonts ? document.fonts.load('150px "Lilita One"') : null,
+          document.fonts ? document.fonts.load('900 50px "Nunito"') : null,
+        ]),
+        new Promise((r) => setTimeout(r, 2500)),     // sem fonte em 2,5s: usa a reserva
+      ]);
+      const cv = drawCard(kind);
+      const blob = await new Promise((r) => cv.toBlob(r, "image/png"));
+      if (!blob) return;
+      const name = kind === "score" ? `myeggs-${G.score}-pontos.png` : "myeggs.png";
+      cards[kind] = { file: new File([blob], name, { type: "image/png" }), text: shareText(kind) };
+    } catch (e) { /* sem imagem: compartilha só o texto */ }
+  }
+
+  function downloadFile(file) {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a");
+    a.href = url; a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // O navegador só deixa compartilhar logo após o toque, por isso a imagem já está pronta antes.
+  async function share(kind) {
+    const card = cards[kind];
+    const text = card ? card.text : shareText(kind);
+
+    if (card && navigator.canShare && navigator.share) {
+      const withFile = { files: [card.file], title: "myEggs", text };
+      if (navigator.canShare(withFile)) {
+        try { await navigator.share(withFile); return; }
+        catch (e) { if (e && e.name === "AbortError") return; /* tenta sem imagem */ }
+      }
+    }
+    if (navigator.share) {
+      try { await navigator.share({ title: "myEggs", text }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    // computador: baixa a imagem e copia o texto
+    if (card) downloadFile(card.file);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(card ? "Imagem baixada e texto copiado. É só postar." : "Link copiado. É só colar e mandar.");
+    } catch (e) {
+      if (card) toast("Imagem baixada. É só postar.");
+      else window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+    }
+  }
+  $$("[data-share]").forEach((b) => b.addEventListener("click", () => share(b.dataset.share)));
+  setTimeout(() => prepareCard("menu"), 1200);    // card do menu, sem atrapalhar o carregamento
+
   // ------------------------------------------------------------ PWA
   const installBtn = $("#btn-install");
   let installEvt = null;
@@ -972,7 +1228,7 @@
 
   // Ganchos de teste / exportação de sprites (usados só em desenvolvimento)
   window.MYEGGS = {
-    G, egg, tgt, L, voices, playVoice, scene, SCN,
+    G, egg, tgt, L, voices, playVoice, scene, SCN, cards, drawCard,
     exportSprite(kind, w, h) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const main = ctx; ctx = c.getContext("2d");

@@ -18,9 +18,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <!-- Compartilhamento -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://myeggsgame.netlify.app/">
   <meta property="og:title" content="myEggs">
-  <meta property="og:description" content="Solte o ovo na hora certa e acerte o alvo.">
-  <meta property="og:image" content="assets/icons/icon-512.png">
+  <meta property="og:description" content="Solte o ovo na hora certa e acerte o alvo. Um game de Alex Leal.">
+  <meta property="og:image" content="https://myeggsgame.netlify.app/assets/icons/icon-512.png">
+  <meta name="twitter:card" content="summary">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,13 +44,16 @@
         <h1 class="logo">myEggs</h1>
         <p class="lead">Toque na tela para soltar o ovo e acerte o alvo lá embaixo. Na cabeça vale 3 pontos.</p>
         <button id="btn-play" class="btn" type="button">Jogar</button>
+        <button class="btn btn-secondary" type="button" data-share="menu">Compartilhar</button>
         <button id="btn-install" class="btn-link" type="button" hidden>Instalar no celular</button>
         <p class="plays"><span data-plays>…</span></p>
         <h2 class="board-title">Top 5</h2>
         <ol class="board" data-board></ol>
 
         <footer class="credits">
-          <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          <a class="studio-link" href="https://www.instagram.com/lizards_games/" target="_blank" rel="noopener" aria-label="Lizards Games no Instagram">
+            <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          </a>
           <span>Um game de Alex Leal</span>
         </footer>
       </div>
@@ -70,12 +76,15 @@
         <p id="over-status" class="status" role="status"></p>
 
         <button id="btn-again" class="btn" type="button">Jogar de novo</button>
+        <button class="btn btn-secondary" type="button" data-share="score">Desafiar amigos</button>
         <p class="plays"><span data-plays>…</span></p>
         <h2 class="board-title">Top 5</h2>
         <ol class="board" data-board></ol>
 
         <footer class="credits">
-          <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          <a class="studio-link" href="https://www.instagram.com/lizards_games/" target="_blank" rel="noopener" aria-label="Lizards Games no Instagram">
+            <img src="assets/lizards-games.png" width="42" height="60" alt="Lizards Games">
+          </a>
           <span>Um game de Alex Leal</span>
         </footer>
       </div>
@@ -84,6 +93,8 @@
     <div id="pause" class="overlay pause" hidden>
       <p>Pausado. Toque para continuar.</p>
     </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <button id="btn-mute" class="mute" type="button" aria-label="Desligar som">🔊</button>
   </main>

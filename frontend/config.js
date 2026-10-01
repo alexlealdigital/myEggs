@@ -7,6 +7,9 @@
     // URL do backend no Render (sem barra no final)
     API_BASE: local ? "http://127.0.0.1:5000" : "https://myeggs-api.onrender.com",
 
+    // Endereço usado no botão Compartilhar (sempre o oficial, mesmo na prévia do Netlify)
+    SHARE_URL: "https://myeggsgame.netlify.app/",
+
     // Sprites. Se um arquivo não existir, o jogo desenha a versão vetorial.
     //   ovo.png            4:5   (ex.: 160x200)
     //   alvo.png           10:13 (ex.: 400x520)
